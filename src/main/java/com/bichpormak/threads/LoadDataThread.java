@@ -3,34 +3,30 @@ package com.bichpormak.threads;
 import com.bichpormak.gui.SchoolManagementSystem;
 import com.bichpormak.exceptions.DataLoadException;
 
-import javax.swing.SwingUtilities;
-import javax.swing.JOptionPane;
+import java.util.concurrent.CountDownLatch;
 
 /**
- * Класс для загрузки данных в отдельном потоке.
+ * Поток для загрузки данных из базы данных.
  */
 public class LoadDataThread extends Thread {
-    private SchoolManagementSystem mainApp;
-    private java.util.concurrent.CountDownLatch latch;
+    private SchoolManagementSystem sms;
+    private CountDownLatch latch;
 
-    public LoadDataThread(SchoolManagementSystem mainApp, java.util.concurrent.CountDownLatch latch) {
-        super("LoadDataThread");
-        this.mainApp = mainApp;
+    public LoadDataThread(SchoolManagementSystem sms, CountDownLatch latch) {
+        this.sms = sms;
         this.latch = latch;
     }
 
     @Override
     public void run() {
-        System.out.println(getName() + ": Начало загрузки данных.");
         try {
-            mainApp.loadDataFromFile();
-            System.out.println(getName() + ": Завершена загрузка данных.");
-            latch.countDown(); // Уведомляем следующий поток о завершении загрузки
+            sms.loadDataFromDatabase();
         } catch (DataLoadException e) {
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(null, "Ошибка в потоке загрузки данных: " + e.getMessage(), "Ошибка", JOptionPane.ERROR_MESSAGE);
-            });
-            e.printStackTrace();
+            javax.swing.JOptionPane.showMessageDialog(null, e.getMessage(), "Ошибка загрузки", javax.swing.JOptionPane.ERROR_MESSAGE);
+            sms.setButtonStatesAfterLoad(false);
+        } finally {
+            latch.countDown();
+            sms.setButtonStatesDuringLoad(false);
         }
     }
 }

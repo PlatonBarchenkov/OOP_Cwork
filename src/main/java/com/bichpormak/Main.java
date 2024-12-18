@@ -10,10 +10,6 @@ import javax.swing.SwingUtilities;
 public class Main {
     public static void main(String[] args) {
         // Запуск интерфейса в потоке обработки событий Swing
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                new SchoolManagementSystem();
-            }
-        });
+        SwingUtilities.invokeLater(() -> new SchoolManagementSystem());
     }
 }

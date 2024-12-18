@@ -1,25 +1,20 @@
 package com.bichpormak.gui;
 
-import com.bichpormak.threads.LoadDataThread;
-import com.bichpormak.threads.SaveDataThread;
-import com.bichpormak.threads.GenerateReportThread;
-import com.bichpormak.models.Teacher;
-import com.bichpormak.models.Student;
-import com.bichpormak.data.DataManager;
-import com.bichpormak.report.ReportManager;
-import com.bichpormak.exceptions.*;
-
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
-import javax.swing.RowFilter;
-import javax.swing.event.ChangeListener;
-import javax.swing.event.ChangeEvent;
 import java.awt.*;
-import java.awt.event.*;
-import java.io.File;
+import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+
+import com.bichpormak.data.DataManager;
+import com.bichpormak.exceptions.*;
+import com.bichpormak.models.Teacher;
+import com.bichpormak.models.Student;
+import com.bichpormak.report.ReportManager;
+import com.bichpormak.threads.GenerateReportThread;
+import com.bichpormak.threads.LoadDataThread;
+import com.bichpormak.threads.SaveDataThread;
 
 /**
  * Главный класс приложения для управления школой.
@@ -45,9 +40,6 @@ public class SchoolManagementSystem {
         // Инициализация данных
         teachers = new ArrayList<>();
         students = new ArrayList<>();
-
-        // Добавление начальных данных
-        initializeData();
 
         // Создание главного окна
         frame = new JFrame("Система Управления Школой");
@@ -76,12 +68,7 @@ public class SchoolManagementSystem {
         frame.add(filterPanel, BorderLayout.SOUTH);
 
         // Обновление критериев поиска при смене вкладки
-        tabbedPane.addChangeListener(new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                updateSearchCriteria();
-            }
-        });
+        tabbedPane.addChangeListener(e -> updateSearchCriteria());
 
         updateSearchCriteria();
 
@@ -93,19 +80,6 @@ public class SchoolManagementSystem {
 
         // Отображение окна
         frame.setVisible(true);
-    }
-
-    /**
-     * Инициализация начальных данных.
-     */
-    private void initializeData() {
-        teachers.add(new Teacher("Иванов Иван Иванович", "Математика", "5А;6Б"));
-        teachers.add(new Teacher("Петрова Анна Сергеевна", "Русский язык", "7В;8Г"));
-        teachers.add(new Teacher("Сидоров Петр Петрович", "История", "9А;10Б"));
-
-        students.add(new Student("Смирнов Алексей Иванович", "5А", "Отлично"));
-        students.add(new Student("Кузнецова Мария Петровна", "6Б", "Хорошо"));
-        students.add(new Student("Новиков Дмитрий Сергеевич", "7В", "Удовлетворительно"));
     }
 
     /**
@@ -126,78 +100,50 @@ public class SchoolManagementSystem {
      */
     private void addListeners() {
         // Слушатель для кнопки "Поиск"
-        filterPanel.addSearchListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                String criterion = filterPanel.getSelectedCriterion();
-                String value = filterPanel.getSearchValue();
-                searchTable(criterion, value);
-            }
+        filterPanel.addSearchListener(e -> {
+            String criterion = filterPanel.getSelectedCriterion();
+            String value = filterPanel.getSearchValue();
+            searchTable(criterion, value);
         });
 
         // Слушатель для кнопки "Сбросить"
-        filterPanel.addResetListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                resetTable();
-            }
-        });
+        filterPanel.addResetListener(e -> resetTable());
 
         // Слушатель для кнопки "Добавить учителя"
-        toolbar.addAddTeacherListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                addTeacherDialog();
-            }
-        });
+        toolbar.addAddTeacherListener(e -> addTeacherDialog());
 
         // Слушатель для кнопки "Удалить учителя"
-        toolbar.addDeleteTeacherListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                deleteSelectedTeachers();
-            }
-        });
+        toolbar.addDeleteTeacherListener(e -> deleteSelectedTeachers());
 
         // Слушатель для кнопки "Добавить ученика"
-        toolbar.addAddStudentListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                addStudentDialog();
-            }
-        });
+        toolbar.addAddStudentListener(e -> addStudentDialog());
 
         // Слушатель для кнопки "Удалить ученика"
-        toolbar.addDeleteStudentListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                deleteSelectedStudents();
-            }
-        });
+        toolbar.addDeleteStudentListener(e -> deleteSelectedStudents());
 
         // Слушатель для кнопки "Загрузить данные"
-        toolbar.addLoadListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                // Отключаем все кнопки кроме загрузки
-                setButtonStatesDuringLoad(true);
-                // Запускаем поток загрузки данных
-                Thread loadThread = new LoadDataThread(SchoolManagementSystem.this, loadLatch);
-                loadThread.start();
-            }
+        toolbar.addLoadListener(e -> {
+            // Отключаем все кнопки кроме загрузки
+            setButtonStatesDuringLoad(true);
+            // Запускаем поток загрузки данных
+            Thread loadThread = new LoadDataThread(this, loadLatch);
+            loadThread.start();
         });
 
         // Слушатель для кнопки "Сохранить данные"
-        toolbar.addSaveListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                // Отключаем кнопку создания отчёта до завершения сохранения
-                toolbar.setGenerateReportEnabled(false);
-                // Запускаем поток сохранения данных
-                Thread saveThread = new SaveDataThread(SchoolManagementSystem.this, loadLatch, saveLatch);
-                saveThread.start();
-            }
+        toolbar.addSaveListener(e -> {
+            // Отключаем кнопку создания отчёта до завершения сохранения
+            toolbar.setGenerateReportEnabled(false);
+            // Запускаем поток сохранения данных
+            Thread saveThread = new SaveDataThread(this, loadLatch, saveLatch);
+            saveThread.start();
         });
 
         // Слушатель для кнопки "Создать отчёт"
-        toolbar.addGenerateReportListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                // Запускаем поток генерации отчёта
-                Thread reportThread = new GenerateReportThread(SchoolManagementSystem.this, saveLatch);
-                reportThread.start();
-            }
+        toolbar.addGenerateReportListener(e -> {
+            // Запускаем поток генерации отчёта
+            Thread reportThread = new GenerateReportThread(this, saveLatch);
+            reportThread.start();
         });
     }
 
@@ -312,6 +258,7 @@ public class SchoolManagementSystem {
                 teacherPanel.addTeacher(newTeacher);
 
                 JOptionPane.showMessageDialog(frame, "Учитель добавлен!", "Добавление", JOptionPane.INFORMATION_MESSAGE);
+                toolbar.setSaveEnabled(true); // Включаем кнопку сохранения
             } catch (InvalidInputException ex) {
                 JOptionPane.showMessageDialog(frame, ex.getMessage(), "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
@@ -350,6 +297,7 @@ public class SchoolManagementSystem {
                 studentPanel.addStudent(newStudent);
 
                 JOptionPane.showMessageDialog(frame, "Ученик добавлен!", "Добавление", JOptionPane.INFORMATION_MESSAGE);
+                toolbar.setSaveEnabled(true); // Включаем кнопку сохранения
             } catch (InvalidInputException ex) {
                 JOptionPane.showMessageDialog(frame, ex.getMessage(), "Ошибка", JOptionPane.ERROR_MESSAGE);
             }
@@ -415,6 +363,7 @@ public class SchoolManagementSystem {
                 teachers.remove(modelRow);
             }
             JOptionPane.showMessageDialog(frame, "Учителя удалены.", "Удаление", JOptionPane.INFORMATION_MESSAGE);
+            toolbar.setSaveEnabled(true); // Включаем кнопку сохранения
         }
     }
 
@@ -472,62 +421,51 @@ public class SchoolManagementSystem {
                     "Удаление",
                     JOptionPane.INFORMATION_MESSAGE
             );
+            toolbar.setSaveEnabled(true); // Включаем кнопку сохранения
         }
     }
 
     /**
-     * Метод для загрузки данных из файла, выбранного пользователем.
+     * Метод для загрузки данных из базы данных.
      *
      * @throws DataLoadException Если возникает ошибка при загрузке данных.
      */
-    public void loadDataFromFile() throws DataLoadException {
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Выберите XML-файл для загрузки данных");
-        int userSelection = fileChooser.showOpenDialog(frame);
+    public void loadDataFromDatabase() throws DataLoadException {
+        dataManager.loadTeachers(teachers);
+        dataManager.loadStudents(students);
 
-        if (userSelection == JFileChooser.APPROVE_OPTION) {
-            File xmlFile = fileChooser.getSelectedFile();
-            dataManager.loadDataFromFile(xmlFile, teachers, students);
-
-            // Обновление таблиц
-            teacherPanel.getTeacherTableModel().setRowCount(0);
-            for (Teacher teacher : teachers) {
-                teacherPanel.addTeacher(teacher);
-            }
-
-            studentPanel.getStudentTableModel().setRowCount(0);
-            for (Student student : students) {
-                studentPanel.addStudent(student);
-            }
-
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(frame, "Данные успешно загружены из XML-файла.", "Успех", JOptionPane.INFORMATION_MESSAGE);
-                // Включаем остальные кнопки после загрузки
-                setButtonStatesAfterLoad(true);
-            });
+        // Обновление таблиц
+        teacherPanel.getTeacherTableModel().setRowCount(0);
+        for (Teacher teacher : teachers) {
+            teacherPanel.addTeacher(teacher);
         }
+
+        studentPanel.getStudentTableModel().setRowCount(0);
+        for (Student student : students) {
+            studentPanel.addStudent(student);
+        }
+
+        SwingUtilities.invokeLater(() -> {
+            JOptionPane.showMessageDialog(frame, "Данные успешно загружены из базы данных.", "Успех", JOptionPane.INFORMATION_MESSAGE);
+            // Включаем остальные кнопки после загрузки
+            setButtonStatesAfterLoad(true);
+        });
     }
 
     /**
-     * Метод для сохранения данных в файл, выбранный пользователем.
+     * Метод для сохранения данных в базу данных.
      *
      * @throws DataSaveException Если возникает ошибка при сохранении данных.
      */
-    public void saveDataToFile() throws DataSaveException {
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Сохраните данные в XML-файл");
-        int userSelection = fileChooser.showSaveDialog(frame);
+    public void saveDataToDatabase() throws DataSaveException {
+        dataManager.saveTeachers(teachers);
+        dataManager.saveStudents(students);
 
-        if (userSelection == JFileChooser.APPROVE_OPTION) {
-            File xmlFile = fileChooser.getSelectedFile();
-            dataManager.saveDataToFile(xmlFile, teachers, students);
-
-            SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(frame, "Данные успешно сохранены в XML-файл.", "Успех", JOptionPane.INFORMATION_MESSAGE);
-                // Включаем кнопку создания отчёта после сохранения
-                toolbar.setGenerateReportEnabled(true);
-            });
-        }
+        SwingUtilities.invokeLater(() -> {
+            JOptionPane.showMessageDialog(frame, "Данные успешно сохранены в базу данных.", "Успех", JOptionPane.INFORMATION_MESSAGE);
+            // Включаем кнопку создания отчёта после сохранения
+            toolbar.setGenerateReportEnabled(true);
+        });
     }
 
     /**
@@ -582,10 +520,6 @@ public class SchoolManagementSystem {
      */
     public static void main(String[] args) {
         // Запуск интерфейса в потоке обработки событий Swing
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                new SchoolManagementSystem();
-            }
-        });
+        SwingUtilities.invokeLater(() -> new SchoolManagementSystem());
     }
 }

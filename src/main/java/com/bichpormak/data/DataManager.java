@@ -5,136 +5,164 @@ import com.bichpormak.models.Student;
 import com.bichpormak.exceptions.DataLoadException;
 import com.bichpormak.exceptions.DataSaveException;
 
-import org.w3c.dom.*;
-import javax.xml.parsers.*;
-import org.xml.sax.SAXException;
-import javax.xml.transform.*;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-
-import java.io.*;
+import java.sql.*;
 import java.util.List;
-import javax.swing.JOptionPane;
 import javax.swing.JFrame;
-import javax.swing.SwingUtilities;
+import javax.swing.JOptionPane;
 
 /**
- * Класс для загрузки и сохранения данных из/в XML-файлы.
+ * Класс для управления данными с использованием SQLite.
  */
 public class DataManager {
 
+    private static final String DB_URL = "jdbc:sqlite:school.db";
     private JFrame frame;
 
     public DataManager(JFrame frame) {
         this.frame = frame;
+        initializeDatabase();
     }
 
     /**
-     * Загрузка данных из XML-файла.
-     *
-     * @param xmlFile Файл для загрузки данных.
-     * @param teachers Список для добавления учителей.
-     * @param students Список для добавления учеников.
-     * @throws DataLoadException Если возникает ошибка при загрузке данных.
+     * Инициализирует базу данных, создавая необходимые таблицы, если они не существуют.
      */
-    public void loadDataFromFile(File xmlFile, List<Teacher> teachers, List<Student> students) throws DataLoadException {
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(xmlFile);
+    private void initializeDatabase() {
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+            if (conn != null) {
+                String createTeachersTable = "CREATE TABLE IF NOT EXISTS teachers ("
+                        + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        + "name TEXT NOT NULL,"
+                        + "subject TEXT NOT NULL,"
+                        + "classes TEXT NOT NULL"
+                        + ");";
 
-            // Нормализация документа
-            doc.getDocumentElement().normalize();
+                String createStudentsTable = "CREATE TABLE IF NOT EXISTS students ("
+                        + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                        + "name TEXT NOT NULL,"
+                        + "class TEXT NOT NULL,"
+                        + "performance TEXT NOT NULL"
+                        + ");";
 
-            // Загрузка учителей
-            NodeList teacherList = doc.getElementsByTagName("teacher");
-            for (int i = 0; i < teacherList.getLength(); i++) {
-                Element teacherElement = (Element) teacherList.item(i);
-                String name = teacherElement.getAttribute("name");
-                String subject = teacherElement.getAttribute("subject");
-                String classes = teacherElement.getAttribute("classes");
-
-                Teacher teacher = new Teacher(name, subject, classes);
-                teachers.add(teacher);
+                Statement stmt = conn.createStatement();
+                stmt.execute(createTeachersTable);
+                stmt.execute(createStudentsTable);
             }
-
-            // Загрузка учеников
-            NodeList studentList = doc.getElementsByTagName("student");
-            for (int i = 0; i < studentList.getLength(); i++) {
-                Element studentElement = (Element) studentList.item(i);
-                String name = studentElement.getAttribute("name");
-                String studentClass = studentElement.getAttribute("class");
-                String performance = studentElement.getAttribute("performance");
-
-                Student student = new Student(name, studentClass, performance);
-                students.add(student);
-            }
-
-        } catch (ParserConfigurationException | SAXException | IOException e) {
-            throw new DataLoadException("Ошибка при загрузке данных: " + e.getMessage());
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(frame, "Ошибка инициализации базы данных: " + e.getMessage(), "Ошибка", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     /**
-     * Сохранение данных в XML-файл.
+     * Загружает данные учителей из базы данных.
      *
-     * @param xmlFile Файл для сохранения данных.
-     * @param teachers Список учителей.
-     * @param students Список учеников.
+     * @param teachers Список для добавления учителей.
+     * @throws DataLoadException Если возникает ошибка при загрузке данных.
+     */
+    public void loadTeachers(List<Teacher> teachers) throws DataLoadException {
+        String query = "SELECT name, subject, classes FROM teachers";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            teachers.clear();
+            while (rs.next()) {
+                String name = rs.getString("name");
+                String subject = rs.getString("subject");
+                String classes = rs.getString("classes");
+                Teacher teacher = new Teacher(name, subject, classes);
+                teachers.add(teacher);
+            }
+
+        } catch (SQLException e) {
+            throw new DataLoadException("Ошибка при загрузке учителей: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Загружает данные учеников из базы данных.
+     *
+     * @param students Список для добавления учеников.
+     * @throws DataLoadException Если возникает ошибка при загрузке данных.
+     */
+    public void loadStudents(List<Student> students) throws DataLoadException {
+        String query = "SELECT name, class, performance FROM students";
+        try (Connection conn = DriverManager.getConnection(DB_URL);
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(query)) {
+
+            students.clear();
+            while (rs.next()) {
+                String name = rs.getString("name");
+                String studentClass = rs.getString("class");
+                String performance = rs.getString("performance");
+                Student student = new Student(name, studentClass, performance);
+                students.add(student);
+            }
+
+        } catch (SQLException e) {
+            throw new DataLoadException("Ошибка при загрузке учеников: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Сохраняет список учителей в базу данных.
+     *
+     * @param teachers Список учителей для сохранения.
      * @throws DataSaveException Если возникает ошибка при сохранении данных.
      */
-    public void saveDataToFile(File xmlFile, List<Teacher> teachers, List<Student> students) throws DataSaveException {
-        try {
-            // Создание фабрики и построителя документов
-            DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
-
-            // Создание нового документа
-            Document doc = docBuilder.newDocument();
-
-            // Создание корневого элемента <school>
-            Element rootElement = doc.createElement("school");
-            doc.appendChild(rootElement);
-
-            // Создание элемента <teachers>
-            Element teachersElement = doc.createElement("teachers");
-            rootElement.appendChild(teachersElement);
-
-            // Добавление каждого учителя как элемента <teacher>
-            for (Teacher teacher : teachers) {
-                Element teacherElement = doc.createElement("teacher");
-                teacherElement.setAttribute("name", teacher.getName());
-                teacherElement.setAttribute("subject", teacher.getSubject());
-                teacherElement.setAttribute("classes", teacher.getClasses());
-                teachersElement.appendChild(teacherElement);
+    public void saveTeachers(List<Teacher> teachers) throws DataSaveException {
+        String deleteAll = "DELETE FROM teachers";
+        String insert = "INSERT INTO teachers(name, subject, classes) VALUES(?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+            conn.setAutoCommit(false);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(deleteAll);
             }
 
-            // Создание элемента <students>
-            Element studentsElement = doc.createElement("students");
-            rootElement.appendChild(studentsElement);
-
-            // Добавление каждого ученика как элемента <student>
-            for (Student student : students) {
-                Element studentElement = doc.createElement("student");
-                studentElement.setAttribute("name", student.getName());
-                studentElement.setAttribute("class", student.getStudentClass());
-                studentElement.setAttribute("performance", student.getPerformance());
-                studentsElement.appendChild(studentElement);
+            try (PreparedStatement pstmt = conn.prepareStatement(insert)) {
+                for (Teacher teacher : teachers) {
+                    pstmt.setString(1, teacher.getName());
+                    pstmt.setString(2, teacher.getSubject());
+                    pstmt.setString(3, teacher.getClasses());
+                    pstmt.addBatch();
+                }
+                pstmt.executeBatch();
             }
 
-            // Создание преобразователя и запись документа в файл
-            TransformerFactory transformerFactory = TransformerFactory.newInstance();
-            Transformer transformer = transformerFactory.newTransformer();
-            // Для красивого форматирования XML
-            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-            DOMSource source = new DOMSource(doc);
+            conn.commit();
+        } catch (SQLException e) {
+            throw new DataSaveException("Ошибка при сохранении учителей: " + e.getMessage());
+        }
+    }
 
-            StreamResult result = new StreamResult(xmlFile);
-            transformer.transform(source, result);
+    /**
+     * Сохраняет список учеников в базу данных.
+     *
+     * @param students Список учеников для сохранения.
+     * @throws DataSaveException Если возникает ошибка при сохранении данных.
+     */
+    public void saveStudents(List<Student> students) throws DataSaveException {
+        String deleteAll = "DELETE FROM students";
+        String insert = "INSERT INTO students(name, class, performance) VALUES(?, ?, ?)";
+        try (Connection conn = DriverManager.getConnection(DB_URL)) {
+            conn.setAutoCommit(false);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(deleteAll);
+            }
 
-        } catch (ParserConfigurationException | TransformerException e) {
-            throw new DataSaveException("Ошибка при сохранении данных: " + e.getMessage());
+            try (PreparedStatement pstmt = conn.prepareStatement(insert)) {
+                for (Student student : students) {
+                    pstmt.setString(1, student.getName());
+                    pstmt.setString(2, student.getStudentClass());
+                    pstmt.setString(3, student.getPerformance());
+                    pstmt.addBatch();
+                }
+                pstmt.executeBatch();
+            }
+
+            conn.commit();
+        } catch (SQLException e) {
+            throw new DataSaveException("Ошибка при сохранении учеников: " + e.getMessage());
         }
     }
 }
